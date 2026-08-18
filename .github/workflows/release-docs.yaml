@@ -1,0 +1,78 @@
+name: Release
+on:
+  push:
+    tags:
+      # These tags should be protected, remember to enable the rule:
+      # https://github.com/canonical/starbase/settings/tag_protection
+      - "[0-9]+.[0-9]+.[0-9]+"
+
+jobs:
+  docs-release:
+    runs-on: [self-hosted]
+    permissions:
+      contents: write
+    steps:
+      - name: Parse version
+        id: version
+        run: |
+          IFS='.' read -r MAJOR MINOR PATCH <<< "${{ github.ref_name }}"
+          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
+          echo "minor=$MINOR" >> "$GITHUB_OUTPUT"
+          echo "patch=$PATCH" >> "$GITHUB_OUTPUT"
+          
+          if [[ $MINOR == 0 && $PATCH == 0 ]]; then
+            echo "::notice::Major version ${{ github.ref_name }} requires manual process"
+            exit 0
+          elif [[ $PATCH == 0 ]]; then
+            echo "is_minor=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Create hotfix branch
+        if: steps.version.outputs.is_minor == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          BRANCH="hotfix/${{ steps.version.outputs.major }}.${{ steps.version.outputs.minor }}"
+          SHA=$(gh api repos/${{ github.repository }}/git/ref/tags/${{ github.ref_name }} --jq '.object.sha')
+          gh api repos/${{ github.repository }}/git/refs -f ref="refs/heads/$BRANCH" -f sha="$SHA" 2>/dev/null || \
+            gh api -X PATCH repos/${{ github.repository }}/git/refs/heads/$BRANCH -f sha="$SHA" -F force=true
+
+      - name: Manage RTD versions
+        if: steps.version.outputs.is_minor == 'true'
+        env:
+          RTD_TOKEN: ${{ secrets.RTD_TOKEN }}
+        run: |
+          API="https://readthedocs.com/api/v3/projects/starbase"
+          MAJOR=${{ steps.version.outputs.major }}
+          MINOR=${{ steps.version.outputs.minor }}
+          PREV_MINOR=$((MINOR - 1))
+          
+          # Update previous version if it exists
+          if curl -sf -H "Authorization: Token $RTD_TOKEN" "$API/versions/hotfix/$MAJOR.$PREV_MINOR/" >/dev/null; then
+            curl -fX PATCH -H "Authorization: Token $RTD_TOKEN" -H "Content-Type: application/json" \
+              -d "{\"slug\": \"$MAJOR.$PREV_MINOR\", \"active\": false}" \
+              "$API/versions/hotfix/$MAJOR.$PREV_MINOR/"
+          fi
+          
+          # Activate new version
+          curl -fX PATCH -H "Authorization: Token $RTD_TOKEN" -H "Content-Type: application/json" \
+            -d "{\"slug\": \"$MAJOR\", \"active\": true}" \
+            "$API/versions/hotfix/$MAJOR.$MINOR/"
+
+      - name: Create redirects
+        if: steps.version.outputs.major != '' && steps.version.outputs.minor != '0'
+        env:
+          RTD_TOKEN: ${{ secrets.RTD_TOKEN }}
+        run: |
+          API="https://readthedocs.com/api/v3/projects/starbase/redirects/"
+          MAJOR=${{ steps.version.outputs.major }}
+          MINOR=${{ steps.version.outputs.minor }}
+          PATCH=${{ steps.version.outputs.patch }}
+          
+          create_redirect() {
+            curl -fX POST -H "Authorization: Token $RTD_TOKEN" -H "Content-Type: application/json" \
+              -d "{\"from_url\": \"/$1/\", \"to_url\": \"/$MAJOR/\", \"type\": \"prefix\", \"force\": false}" "$API"
+          }
+          
+          [[ $PATCH == 0 ]] && create_redirect "$MAJOR.$MINOR"
+          create_redirect "$MAJOR.$MINOR.$PATCH"
