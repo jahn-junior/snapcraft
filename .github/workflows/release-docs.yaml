@@ -53,21 +53,15 @@ jobs:
           
           # Update previous version slug and deactivate if it exists
           if curl -sf -H "Authorization: Token $RTD_TOKEN" "$API/$MAJOR/" >/dev/null; then
-            curl -fX PATCH -H "Authorization: Token $RTD_TOKEN" -H "Content-Type: application/json" \
-              -d "{\"slug\": \"$MAJOR.$PREV_MINOR\"}" \
+            curl -vfX PATCH -H "Authorization: Token $RTD_TOKEN" -H "Content-Type: application/json" \
+              -d "{\"slug\": \"$MAJOR.$PREV_MINOR\", \"active\": false}" \
               "$API/$MAJOR/"
-            curl -fX PATCH -H "Authorization: Token $RTD_TOKEN" -H "Content-Type: application/json" \
-              -d "{\"active\": false}" \
-              "$API/$MAJOR.$PREV_MINOR/"
           fi
           
           # Update new version slug to major and activate
-          curl -fX PATCH -H "Authorization: Token $RTD_TOKEN" -H "Content-Type: application/json" \
-            -d "{\"slug\": \"$MAJOR\"}" \
+          curl -vfX PATCH -H "Authorization: Token $RTD_TOKEN" -H "Content-Type: application/json" \
+            -d "{\"slug\": \"$MAJOR\", \"active\": true}" \
             "$API/hotfix-$MAJOR.$MINOR/"
-          curl -fX PATCH -H "Authorization: Token $RTD_TOKEN" -H "Content-Type: application/json" \
-            -d "{\"active\": true}" \
-            "$API/$MAJOR/"
 
       - name: Create redirects
         if: steps.version.outputs.major != '' && steps.version.outputs.minor != '0'
