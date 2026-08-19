@@ -46,10 +46,10 @@ jobs:
         env:
           RTD_TOKEN: ${{ secrets.RTD_TOKEN }}
         run: |
-          API="https://readthedocs.com/api/v3/projects/starbase"
+          API="https://readthedocs.com/api/v3/projects/ecoldi-test"
           MAJOR=${{ steps.version.outputs.major }}
           MINOR=${{ steps.version.outputs.minor }}
-          PREV_MINOR=$((MINOR - 1))f
+          PREV_MINOR=$((MINOR - 1))
           
           # Update previous version if it exists
           if curl -sf -H "Authorization: Token $RTD_TOKEN" "$API/versions/hotfix/$MAJOR.$PREV_MINOR/" >/dev/null; then
@@ -68,7 +68,7 @@ jobs:
         env:
           RTD_TOKEN: ${{ secrets.RTD_TOKEN }}
         run: |
-          API="https://readthedocs.com/api/v3/projects/starbase/redirects/"
+          API="https://readthedocs.com/api/v3/projects/ecoldi-test/redirects/"
           MAJOR=${{ steps.version.outputs.major }}
           MINOR=${{ steps.version.outputs.minor }}
           PATCH=${{ steps.version.outputs.patch }}
