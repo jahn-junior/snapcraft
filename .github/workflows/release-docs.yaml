@@ -34,7 +34,7 @@ jobs:
         run: |
           BRANCH="hotfix/${{ steps.version.outputs.major }}.${{ steps.version.outputs.minor }}"
           SHA=$(curl -sf -H "Authorization: token $GH_TOKEN" \
-            "https://api.github.com/repos/${{ github.repository }}/git/ref/tags/${{ github.ref_name }}" | jq -r '.object.sha')
+            "https://api.github.com/repos/${{ github.repository }}/git/refs/tags/${{ github.ref_name }}" | jq -r '.object.sha')
           curl -sfX POST -H "Authorization: token $GH_TOKEN" -H "Content-Type: application/json" \
             -d "{\"ref\":\"refs/heads/$BRANCH\",\"sha\":\"$SHA\"}" \
             "https://api.github.com/repos/${{ github.repository }}/git/refs" 2>/dev/null || \
