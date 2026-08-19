@@ -33,9 +33,14 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           BRANCH="hotfix/${{ steps.version.outputs.major }}.${{ steps.version.outputs.minor }}"
-          SHA=$(gh api repos/${{ github.repository }}/git/ref/tags/${{ github.ref_name }} --jq '.object.sha')
-          gh api repos/${{ github.repository }}/git/refs -f ref="refs/heads/$BRANCH" -f sha="$SHA" 2>/dev/null || \
-            gh api -X PATCH repos/${{ github.repository }}/git/refs/heads/$BRANCH -f sha="$SHA" -F force=true
+          SHA=$(curl -sf -H "Authorization: token $GH_TOKEN" \
+            "https://api.github.com/repos/${{ github.repository }}/git/ref/tags/${{ github.ref_name }}" | jq -r '.object.sha')
+          curl -sfX POST -H "Authorization: token $GH_TOKEN" -H "Content-Type: application/json" \
+            -d "{\"ref\":\"refs/heads/$BRANCH\",\"sha\":\"$SHA\"}" \
+            "https://api.github.com/repos/${{ github.repository }}/git/refs" 2>/dev/null || \
+          curl -sfX PATCH -H "Authorization: token $GH_TOKEN" -H "Content-Type: application/json" \
+            -d "{\"sha\":\"$SHA\",\"force\":true}" \
+            "https://api.github.com/repos/${{ github.repository }}/git/refs/heads/$BRANCH"
 
       - name: Manage RTD versions
         if: steps.version.outputs.is_minor == 'true'
@@ -45,7 +50,7 @@ jobs:
           API="https://readthedocs.com/api/v3/projects/starbase"
           MAJOR=${{ steps.version.outputs.major }}
           MINOR=${{ steps.version.outputs.minor }}
-          PREV_MINOR=$((MINOR - 1))
+          PREV_MINOR=$((MINOR - 1))f
           
           # Update previous version if it exists
           if curl -sf -H "Authorization: Token $RTD_TOKEN" "$API/versions/hotfix/$MAJOR.$PREV_MINOR/" >/dev/null; then
@@ -76,3 +81,4 @@ jobs:
           
           [[ $PATCH == 0 ]] && create_redirect "$MAJOR.$MINOR"
           create_redirect "$MAJOR.$MINOR.$PATCH"
+
