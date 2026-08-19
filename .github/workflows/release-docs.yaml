@@ -64,7 +64,7 @@ jobs:
           # Update new version slug to major and activate
           curl -fX PATCH -H "Authorization: Token $RTD_TOKEN" -H "Content-Type: application/json" \
             -d "{\"slug\": \"$MAJOR\"}" \
-            "$API/$MAJOR.$MINOR/"
+            "$API/hotfix-$MAJOR.$MINOR/"
           curl -fX PATCH -H "Authorization: Token $RTD_TOKEN" -H "Content-Type: application/json" \
             -d "{\"active\": true}" \
             "$API/$MAJOR/"
