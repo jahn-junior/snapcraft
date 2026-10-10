@@ -70,7 +70,7 @@ jobs:
           fi
           
           # Update new version slug to major and activate
-          curl -fX PATCH \
+          curl -fsS --retry 10 --retry-delay 6 --retry-all-errors -X PATCH \
             -H "Authorization: Token $RTD_TOKEN" -H "Content-Type: application/json" \
             -d "{\"slug\": \"$MAJOR\", \"active\": true}" \
             "$API/hotfix-$MAJOR.$MINOR/"
