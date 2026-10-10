@@ -99,7 +99,7 @@ jobs:
           create_redirect() {
             curl -fX POST \
               -H "Authorization: Token $RTD_TOKEN" -H "Content-Type: application/json" \
-              -d "{\"from_url\": \"/$1/\", \"to_url\": \"/$MAJOR/\", \"type\": \"prefix\", \"force\": false}" "$API"
+              -d "{\"from_url\": \"/$1/*\", \"to_url\": \"/$MAJOR/:splat\", \"type\": \"exact\", \"force\": true}" "$API"
           }
           
           [[ $PATCH == 0 ]] && create_redirect "$MAJOR.$MINOR"
