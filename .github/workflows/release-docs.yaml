@@ -11,28 +11,27 @@ jobs:
     runs-on: [self-hosted]
     permissions:
       contents: write
+    env:
+      RTD_PROJECT: ${{ vars.RTD_PROJECT }}
+      RTD_TOKEN: ${{ secrets.RTD_TOKEN }}
     steps:
       - name: Parse version
-        id: version
         run: |
           IFS='.' read -r MAJOR MINOR PATCH <<< "${{ github.ref_name }}"
-          echo "major=$MAJOR" >> "$GITHUB_OUTPUT"
-          echo "minor=$MINOR" >> "$GITHUB_OUTPUT"
-          echo "patch=$PATCH" >> "$GITHUB_OUTPUT"
+          echo "MAJOR=$MAJOR" >> "$GITHUB_ENV"
+          echo "MINOR=$MINOR" >> "$GITHUB_ENV"
+          echo "PATCH=$PATCH" >> "$GITHUB_ENV"
           
-          if [[ $MINOR == 0 && $PATCH == 0 ]]; then
-            echo "::notice::Major version ${{ github.ref_name }} requires manual process"
-            exit 0
-          elif [[ $PATCH == 0 ]]; then
-            echo "is_minor=true" >> "$GITHUB_OUTPUT"
+          if [[ $PATCH == 0 && $MINOR != 0 ]]; then
+            echo "IS_MINOR=true" >> "$GITHUB_ENV"
           fi
 
       - name: Create hotfix branch
-        if: steps.version.outputs.is_minor == 'true'
+        if: env.PATCH == '0'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          BRANCH="hotfix/${{ steps.version.outputs.major }}.${{ steps.version.outputs.minor }}"
+          BRANCH="hotfix/$MAJOR.$MINOR"
           SHA="${{ github.sha }}"
           curl -sfX POST -H "Authorization: Token $GH_TOKEN" -H "Content-Type: application/json" \
             -d "{\"ref\":\"refs/heads/$BRANCH\",\"sha\":\"$SHA\"}" \
@@ -42,27 +41,21 @@ jobs:
             "https://api.github.com/repos/${{ github.repository }}/git/refs/heads/$BRANCH"
 
       - name: Sync RTD versions
-        if: steps.version.outputs.is_minor == 'true'
-        env:
-          RTD_TOKEN: ${{ secrets.RTD_TOKEN }}
+        if: env.PATCH == '0'
         run: |
           curl \
             -fX POST \
             -H "Authorization: Token $RTD_TOKEN" \
-            https://app.readthedocs.com/api/v3/projects/canonical-ecoldi-test/sync-versions/
+            "https://app.readthedocs.com/api/v3/projects/$RTD_PROJECT/sync-versions/"
 
       - name: Manage RTD versions
-        if: steps.version.outputs.is_minor == 'true'
-        env:
-          RTD_TOKEN: ${{ secrets.RTD_TOKEN }}
+        if: env.PATCH == '0'
         run: |
-          API="https://app.readthedocs.com/api/v3/projects/canonical-ecoldi-test/versions"
-          MAJOR=${{ steps.version.outputs.major }}
-          MINOR=${{ steps.version.outputs.minor }}
-          PREV_MINOR=$((MINOR - 1))
+          API="https://app.readthedocs.com/api/v3/projects/$RTD_PROJECT/versions"
           
-          # Update previous version slug and deactivate if it exists
-          if curl -sf -H "Authorization: Token $RTD_TOKEN" "$API/$MAJOR/" >/dev/null; then
+          # For minor releases, rename and deactivate the outgoing major version
+          if [[ $IS_MINOR == true ]] && curl -sf -H "Authorization: Token $RTD_TOKEN" "$API/$MAJOR/" >/dev/null; then
+            PREV_MINOR=$((MINOR - 1))
             curl -fX PATCH \
               -H "Authorization: Token $RTD_TOKEN" -H "Content-Type: application/json" \
               -d "{\"slug\": \"$MAJOR.$PREV_MINOR\", \"active\": false}" \
@@ -76,25 +69,16 @@ jobs:
             "$API/hotfix-$MAJOR.$MINOR/"
 
       - name: Update project default version
-        if: steps.version.outputs.is_minor == 'true'
-        env:
-          RTD_TOKEN: ${{ secrets.RTD_TOKEN }}
+        if: env.PATCH == '0'
         run: |
-          MAJOR=${{ steps.version.outputs.major }}
           curl -fX PATCH \
             -H "Authorization: Token $RTD_TOKEN" -H "Content-Type: application/json" \
             -d "{\"default_version\": \"$MAJOR\"}" \
-            "https://app.readthedocs.com/api/v3/projects/canonical-ecoldi-test/"
+            "https://app.readthedocs.com/api/v3/projects/$RTD_PROJECT/"
 
       - name: Create redirects
-        if: steps.version.outputs.major != '' && steps.version.outputs.minor != '0'
-        env:
-          RTD_TOKEN: ${{ secrets.RTD_TOKEN }}
         run: |
-          API="https://app.readthedocs.com/api/v3/projects/canonical-ecoldi-test/redirects/"
-          MAJOR=${{ steps.version.outputs.major }}
-          MINOR=${{ steps.version.outputs.minor }}
-          PATCH=${{ steps.version.outputs.patch }}
+          API="https://app.readthedocs.com/api/v3/projects/$RTD_PROJECT/redirects/"
           
           create_redirect() {
             curl -fX POST \
