@@ -1,4 +1,4 @@
-name: Release
+name: Documentation release
 on:
   push:
     tags:
@@ -32,13 +32,13 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           BRANCH="hotfix/$MAJOR.$MINOR"
-          SHA="${{ github.sha }}"
-          curl -sfX POST -H "Authorization: Token $GH_TOKEN" -H "Content-Type: application/json" \
-            -d "{\"ref\":\"refs/heads/$BRANCH\",\"sha\":\"$SHA\"}" \
-            "https://api.github.com/repos/${{ github.repository }}/git/refs" 2>/dev/null || \
-          curl -sfX PATCH -H "Authorization: Token $GH_TOKEN" -H "Content-Type: application/json" \
-            -d "{\"sha\":\"$SHA\",\"force\":true}" \
-            "https://api.github.com/repos/${{ github.repository }}/git/refs/heads/$BRANCH"
+          API="https://api.github.com/repos/${{ github.repository }}"
+
+          if ! curl -sf -H "Authorization: Token $GH_TOKEN" "$API/git/refs/heads/$BRANCH" >/dev/null; then
+            curl -fX POST -H "Authorization: Token $GH_TOKEN" -H "Content-Type: application/json" \
+              -d "{\"ref\":\"refs/heads/$BRANCH\",\"sha\":\"${{ github.sha }}\"}" \
+              "$API/git/refs"
+          fi
 
       - name: Sync RTD versions
         if: env.PATCH == '0'
@@ -78,12 +78,11 @@ jobs:
 
       - name: Create redirects
         run: |
-          API="https://app.readthedocs.com/api/v3/projects/$RTD_PROJECT/redirects/"
-          
           create_redirect() {
             curl -fX POST \
               -H "Authorization: Token $RTD_TOKEN" -H "Content-Type: application/json" \
-              -d "{\"from_url\": \"/$1/*\", \"to_url\": \"/$MAJOR/:splat\", \"type\": \"exact\", \"force\": true}" "$API"
+              -d "{\"from_url\": \"/$1/*\", \"to_url\": \"/$MAJOR/:splat\", \"type\": \"exact\", \"force\": true}" \
+              "https://app.readthedocs.com/api/v3/projects/$RTD_PROJECT/redirects/"
           }
           
           [[ $PATCH == 0 ]] && create_redirect "$MAJOR.$MINOR"
