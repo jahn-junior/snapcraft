@@ -1,10 +1,7 @@
 name: Documentation release
-
 on:
   push:
     tags:
-      # These tags should be protected, remember to enable the rule:
-      # https://github.com/canonical/starbase/settings/tag_protection
       - "[0-9]+.[0-9]+.[0-9]+"
 
 jobs:
@@ -13,7 +10,6 @@ jobs:
       contents: write
     uses: canonical/starflow/.github/workflows/release-docs.yaml@work/rtd-release-automation/CRAFT-5278
     with:
-      # TODO: set to your Read the Docs project slug.
-      rtd-project: ecoldi-test
+      rtd-project: canonical-ecoldi-test
     secrets:
       RTD_TOKEN: ${{ secrets.RTD_TOKEN }}
